@@ -1,0 +1,119 @@
+[
+  {
+    "detectionId": "DEBRIS_1852_7291",
+    "imageId": "S2B_MSIL1C_20261004T054500_N0500_R048_T43QDA",
+    "timestamp": "2026-10-04T08:30:00Z",
+    "latitude": 18.523,
+    "longitude": 72.91,
+    "estimatedArea": 2850.5,
+    "confidence": 0.92,
+    "riskScore": 78.5,
+    "priority": "HIGH",
+    "modelVersion": "DebrisUNet_v1.0",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            72.905,
+            18.518
+          ],
+          [
+            72.915,
+            18.518
+          ],
+          [
+            72.915,
+            18.528
+          ],
+          [
+            72.905,
+            18.528
+          ],
+          [
+            72.905,
+            18.518
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "detectionId": "DEBRIS_1841_7282",
+    "imageId": "S2A_MSIL1C_20261003T060000_N0500_R048_T43QDA",
+    "timestamp": "2026-10-03T11:15:00Z",
+    "latitude": 18.412,
+    "longitude": 72.825,
+    "estimatedArea": 1240.0,
+    "confidence": 0.84,
+    "riskScore": 54.2,
+    "priority": "MEDIUM",
+    "modelVersion": "DebrisUNet_v1.0",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            72.82,
+            18.408
+          ],
+          [
+            72.83,
+            18.408
+          ],
+          [
+            72.83,
+            18.416
+          ],
+          [
+            72.82,
+            18.416
+          ],
+          [
+            72.82,
+            18.408
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "detectionId": "DEBRIS_1865_7298",
+    "imageId": "S2B_MSIL1C_20261004T054500_N0500_R048_T43QDA",
+    "timestamp": "2026-10-04T08:30:00Z",
+    "latitude": 18.651,
+    "longitude": 72.984,
+    "estimatedArea": 420.0,
+    "confidence": 0.79,
+    "riskScore": 28.6,
+    "priority": "LOW",
+    "modelVersion": "DebrisUNet_v1.0",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            72.98,
+            18.648
+          ],
+          [
+            72.988,
+            18.648
+          ],
+          [
+            72.988,
+            18.654
+          ],
+          [
+            72.98,
+            18.654
+          ],
+          [
+            72.98,
+            18.648
+          ]
+        ]
+      ]
+    }
+  }
+]

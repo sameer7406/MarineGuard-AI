@@ -1,0 +1,19 @@
+{
+  "model_name": "MaritimeVesselClassifier_CNN",
+  "model_version": "v1.0.0",
+  "training_timestamp": "2026-10-04T23:27:19Z",
+  "dataset_name": "xView3 Maritime Benchmark Alignment",
+  "classes": [
+    "Cargo",
+    "Fishing",
+    "Tanker",
+    "Tug",
+    "Suspicious/Unclassified"
+  ],
+  "metrics": {
+    "accuracy": 0.17,
+    "macro_precision": 0.034,
+    "macro_recall": 0.2,
+    "macro_f1": 0.0581
+  }
+}

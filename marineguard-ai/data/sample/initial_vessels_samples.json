@@ -1,0 +1,39 @@
+[
+  {
+    "vesselId": "VESSEL_X904_FLAGGED",
+    "timestamp": "2026-10-04T09:12:00Z",
+    "latitude": 18.55,
+    "longitude": 72.85,
+    "vesselType": "Suspicious/Unclassified",
+    "confidence": 0.88,
+    "aisStatus": "Missing",
+    "speedKnots": 0.8,
+    "headingDegrees": 140.0,
+    "riskScore": 85.0,
+    "riskLevel": "HIGH RISK",
+    "insideProtectedZone": true,
+    "riskFactors": [
+      "Unidentified visual profile absent from standard vessel registry",
+      "AIS transponder signal gap or unexpected transmission failure",
+      "Vessel operating within designated Marine Protected Area (MPA) boundary",
+      "Unusual loitering or stationary drift pattern in regulated waters"
+    ],
+    "verificationStatus": "Requires Verification"
+  },
+  {
+    "vesselId": "VESSEL_CARGO_882",
+    "timestamp": "2026-10-04T09:30:00Z",
+    "latitude": 18.32,
+    "longitude": 72.95,
+    "vesselType": "Cargo",
+    "confidence": 0.94,
+    "aisStatus": "Active",
+    "speedKnots": 14.5,
+    "headingDegrees": 210.0,
+    "riskScore": 12.0,
+    "riskLevel": "LOW RISK",
+    "insideProtectedZone": false,
+    "riskFactors": [],
+    "verificationStatus": "Verified Standard Vessel"
+  }
+]

@@ -1,0 +1,75 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pacific Garbage Patch Marine Reserve Corridor",
+        "designation": "High Priority Ecological Sanctuary",
+        "strictness": "Strict No-Take Zone"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.7,
+              18.4
+            ],
+            [
+              73.1,
+              18.4
+            ],
+            [
+              73.1,
+              18.75
+            ],
+            [
+              72.7,
+              18.75
+            ],
+            [
+              72.7,
+              18.4
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Coral Reef National Park Marine Protected Zone",
+        "designation": "Sensitive Marine Habitat",
+        "strictness": "No Commercial Fishing"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              72.5,
+              18.2
+            ],
+            [
+              72.8,
+              18.2
+            ],
+            [
+              72.8,
+              18.45
+            ],
+            [
+              72.5,
+              18.45
+            ],
+            [
+              72.5,
+              18.2
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

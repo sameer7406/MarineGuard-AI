@@ -1,0 +1,19 @@
+{
+  "model_name": "DebrisTrajectoryGradientBoosting",
+  "model_version": "v1.0.0",
+  "training_timestamp": "2026-10-04T23:27:20Z",
+  "metrics": {
+    "mae_km": 5.72,
+    "max_error_km": 28.722,
+    "endpoint_error_km": 10.973
+  },
+  "features": [
+    "lat",
+    "lon",
+    "ocean_u",
+    "ocean_v",
+    "wind_u",
+    "wind_v",
+    "horizon_hours"
+  ]
+}
