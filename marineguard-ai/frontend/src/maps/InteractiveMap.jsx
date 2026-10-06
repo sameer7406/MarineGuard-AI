@@ -50,10 +50,11 @@ const InteractiveMap = ({
         scrollWheelZoom={true}
       >
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Dark Tactical Map">
+          <LayersControl.BaseLayer checked name="Tactical Ocean Map (OpenStreetMap)">
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; Sentinel-2 Copernicus'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              className="osm-tactical-tiles"
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellite Imagery">
@@ -198,26 +199,38 @@ const InteractiveMap = ({
                     dashArray: '8, 8'
                   }}
                 />
-                {selectedTrajectory.trajectory.map((pt, idx) => (
-                  <Marker
-                    key={`traj-step-${idx}`}
-                    position={[pt.latitude, pt.longitude]}
-                    icon={L.divIcon({
-                      html: `<div style="background:#00f0ff; color:#030814; font-size:9px; font-weight:bold; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:2px solid #030814;">${pt.horizon_hours}h</div>`,
-                      className: 'traj-marker',
-                      iconSize: [18, 18],
-                      iconAnchor: [9, 9]
-                    })}
-                  >
-                    <Popup>
-                      <div className="font-mono text-xs">
-                        <div className="text-cyan-400 font-bold">{pt.step_name} PREDICTION</div>
-                        <p className="text-slate-300 text-[10px]">Cumulative Distance: {pt.cumulative_distance_km} km</p>
-                        <p className="text-slate-400 text-[10px]">{formatCoordinates(pt.latitude, pt.longitude)}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
+                {selectedTrajectory.trajectory.map((pt, idx) => {
+                  const isArrival = Boolean(pt.is_coastal_arrival);
+                  const markerColor = isArrival ? '#f59e0b' : '#00f0ff';
+                  const markerText = isArrival ? 'LAND' : `${pt.horizon_hours}h`;
+                  return (
+                    <Marker
+                      key={`traj-step-${idx}`}
+                      position={[pt.latitude, pt.longitude]}
+                      icon={L.divIcon({
+                        html: `<div style="background:${markerColor}; color:#030814; font-size:9px; font-weight:bold; border-radius:50%; width:${isArrival ? '22px' : '18px'}; height:${isArrival ? '22px' : '18px'}; display:flex; align-items:center; justify-content:center; border:2px solid #030814; box-shadow: 0 0 8px ${markerColor};">${markerText}</div>`,
+                        className: 'traj-marker',
+                        iconSize: isArrival ? [22, 22] : [18, 18],
+                        iconAnchor: isArrival ? [11, 11] : [9, 9]
+                      })}
+                    >
+                      <Popup>
+                        <div className="font-mono text-xs">
+                          <div className={isArrival ? "text-amber-400 font-bold" : "text-cyan-400 font-bold"}>
+                            {isArrival ? "COASTAL ARRIVAL • BEACHING / LANDFALL" : `${pt.step_name} PREDICTION`}
+                          </div>
+                          <p className="text-slate-300 text-[10px]">Cumulative Distance: {pt.cumulative_distance_km} km</p>
+                          <p className="text-slate-400 text-[10px]">{formatCoordinates(pt.latitude, pt.longitude)}</p>
+                          {isArrival && (
+                            <p className="text-amber-300 text-[10px] mt-1 font-semibold">
+                              Trajectory clamped: ocean drift halted at coastline boundary ({pt.horizon_hours}h).
+                            </p>
+                          )}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
               </LayerGroup>
             </LayersControl.Overlay>
           )}

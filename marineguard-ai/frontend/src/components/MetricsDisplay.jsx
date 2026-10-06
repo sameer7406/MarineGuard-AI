@@ -6,7 +6,7 @@ const MetricsDisplay = ({ metrics }) => {
   const debrisDice = metrics?.debrisUNet?.dice ?? 0.9400;
   const debrisF1 = metrics?.debrisUNet?.f1 ?? 0.9400;
   const driftMAE = metrics?.trajectoryPredictor?.maeKm ?? 5.72;
-  const vesselAcc = metrics?.vesselClassifier?.accuracy ?? 0.88;
+  const vesselAcc = metrics?.vesselClassifier?.accuracy ?? 0.84;
 
   return (
     <div className="glass-panel p-5 rounded-2xl border border-cyan-500/20">
@@ -39,7 +39,7 @@ const MetricsDisplay = ({ metrics }) => {
         <div className="p-3 rounded-xl bg-ocean-950/80 border border-cyan-500/20">
           <span className="text-slate-400 text-[10px] block">VESSEL DETECTOR ACC</span>
           <span className="text-emerald-400 font-extrabold text-lg">{(vesselAcc * 100).toFixed(1)}%</span>
-          <span className="text-[10px] text-slate-400 block mt-1">xView3 CV Accuracy</span>
+          <span className="text-[10px] text-slate-400 block mt-1">Morphological Benchmark</span>
         </div>
       </div>
     </div>

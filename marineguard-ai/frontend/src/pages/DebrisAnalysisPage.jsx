@@ -4,7 +4,7 @@ import RiskWeightControls from '../components/RiskWeightControls';
 import RiskBadge from '../components/RiskBadge';
 import MetricsDisplay from '../components/MetricsDisplay';
 import { triggerDebrisDetection, calculateDebrisRisk } from '../services/api';
-import { Compass, Upload, Play, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
+import { Compass, Upload, Play, CheckCircle2, AlertCircle, FileText, RefreshCw } from 'lucide-react';
 import { formatCoordinates, formatArea } from '../services/mapUtils';
 
 const DebrisAnalysisPage = ({ onOpenReport }) => {
@@ -12,6 +12,8 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
   const [lon, setLon] = useState('72.9100');
   const [loading, setLoading] = useState(false);
   const [detectionResult, setDetectionResult] = useState(null);
+  const [lastExecuted, setLastExecuted] = useState(null);
+  const [error, setError] = useState(null);
   const [weights, setWeights] = useState({
     w_area: 0.25,
     w_eco: 0.30,
@@ -22,44 +24,63 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
 
   const handleRunDetection = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await triggerDebrisDetection({
-        latitude: parseFloat(lat),
-        longitude: parseFloat(lon),
-        tile_id: 'S2B_MSIL1C_20261004T054500'
-      });
+      const parsedLat = parseFloat(lat);
+      const parsedLon = parseFloat(lon);
+      const [res] = await Promise.all([
+        triggerDebrisDetection({
+          latitude: isNaN(parsedLat) ? 18.5230 : parsedLat,
+          longitude: isNaN(parsedLon) ? 72.9100 : parsedLon,
+          tile_id: 'S2B_MSIL1C_20261004T054500'
+        }),
+        new Promise((resolve) => setTimeout(resolve, 500))
+      ]);
       setDetectionResult(res);
+      setLastExecuted(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
+      setError(err?.response?.data?.message || err?.message || 'Debris detection execution failed.');
     } finally {
       setLoading(false);
     }
   };
 
+  const activeDet = detectionResult?.detections?.[0] || detectionResult?.detection;
+
   const handleRecalculateRisk = async () => {
-    if (!detectionResult || !detectionResult.detections?.[0]) return;
-    const det = detectionResult.detections[0];
+    if (!activeDet) return;
     try {
+      const coastalDist = activeDet.gisSpatialAnalysis?.coastal_distance_km ?? activeDet.gis_spatial_analysis?.coastal_distance_km ?? 12.5;
+      const mpaDist = activeDet.gisSpatialAnalysis?.protected_zone_distance_km ?? activeDet.gis_spatial_analysis?.protected_zone_distance_km ?? 8.0;
+      const area = activeDet.estimatedArea ?? activeDet.estimated_area_m2 ?? 2500;
+      const conf = activeDet.confidence ?? 0.90;
+
       const riskRes = await calculateDebrisRisk({
-        estimated_area_m2: det.estimated_area_m2,
-        coastal_distance_km: 12.5,
-        protected_zone_distance_km: 8.0,
+        estimated_area_m2: area,
+        coastal_distance_km: coastalDist,
+        protected_zone_distance_km: mpaDist,
         predicted_exposure_km: 15.0,
-        confidence: det.confidence,
-        weights: weights
+        confidence: conf,
+        weights: weights,
+        latitude: activeDet.latitude,
+        longitude: activeDet.longitude
       });
       
       const updated = { ...detectionResult };
-      updated.detections[0].risk_score = riskRes.risk_score;
-      updated.detections[0].priority = riskRes.priority;
-      updated.detections[0].risk_breakdown = riskRes.score_breakdown;
+      const target = updated.detections?.[0] || updated.detection;
+      if (target) {
+        target.risk_score = riskRes.risk_score;
+        target.riskScore = riskRes.risk_score;
+        target.priority = riskRes.priority;
+        target.risk_breakdown = riskRes.score_breakdown;
+        target.riskBreakdown = riskRes.score_breakdown;
+      }
       setDetectionResult(updated);
     } catch (err) {
       console.error(err);
     }
   };
-
-  const activeDet = detectionResult?.detections?.[0];
 
   return (
     <div className="space-y-8">
@@ -113,12 +134,23 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
               <p className="text-[11px] text-slate-400">Sentinel-2B MSI (Tile: S2B_MSIL1C_20261004T054500)</p>
             </div>
 
+            {error && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/30 text-xs font-mono text-red-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <button
               onClick={handleRunDetection}
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-ocean-950 font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-ocean-950 font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] flex items-center justify-center gap-2 active:scale-95 disabled:opacity-80"
             >
-              <Play className="w-4 h-4 fill-current" />
+              {loading ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-ocean-950" />
+              ) : (
+                <Play className="w-4 h-4 fill-current" />
+              )}
               <span>{loading ? 'Running PyTorch Model Inference...' : 'Execute Debris Detection'}</span>
             </button>
           </div>
@@ -137,10 +169,18 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
 
           {/* Detection Results Breakdown Card */}
           {activeDet ? (
-            <div className="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-4 animate-in fade-in">
+            <div key={lastExecuted || 'initial'} className="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-4 animate-in fade-in">
               <div className="flex items-center justify-between border-b border-cyan-500/20 pb-3">
                 <div>
-                  <span className="font-mono text-xs text-cyan-400 font-bold">{activeDet.detection_id}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-cyan-400 font-bold">{activeDet.detectionId || activeDet.detection_id}</span>
+                    {lastExecuted && (
+                      <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        Inference Active • {lastExecuted}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-base font-bold text-white mt-0.5">Multispectral Floating Plastic Detection</h3>
                 </div>
                 <RiskBadge priority={activeDet.priority} />
@@ -153,7 +193,7 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] block">ESTIMATED AREA</span>
-                  <span className="text-cyan-300 font-bold">{formatArea(activeDet.estimated_area_m2)}</span>
+                  <span className="text-cyan-300 font-bold">{formatArea(activeDet.estimatedArea ?? activeDet.estimated_area_m2)}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] block">MODEL CONFIDENCE</span>
@@ -161,26 +201,29 @@ const DebrisAnalysisPage = ({ onOpenReport }) => {
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] block">RELATIVE RISK SCORE</span>
-                  <span className="text-amber-400 font-bold">{activeDet.risk_score} / 100</span>
+                  <span className="text-amber-400 font-bold">{activeDet.riskScore ?? activeDet.risk_score} / 100</span>
                 </div>
               </div>
 
               {/* Risk Breakdown Component Bar */}
-              {activeDet.risk_breakdown && (
-                <div className="space-y-2 font-mono text-xs pt-2">
-                  <span className="text-cyan-300 font-bold block">RISK FACTOR BREAKDOWN:</span>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-300">
-                    <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Area Score: <b className="text-cyan-400">{activeDet.risk_breakdown.area_score}</b></div>
-                    <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">MPA Eco Proximity: <b className="text-cyan-400">{activeDet.risk_breakdown.ecological_proximity_score}</b></div>
-                    <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Coastal Proximity: <b className="text-cyan-400">{activeDet.risk_breakdown.coastal_proximity_score}</b></div>
-                    <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Confidence Score: <b className="text-cyan-400">{activeDet.risk_breakdown.confidence_score}</b></div>
+              {(activeDet.riskBreakdown || activeDet.risk_breakdown) && (() => {
+                const breakdown = activeDet.riskBreakdown || activeDet.risk_breakdown;
+                return (
+                  <div className="space-y-2 font-mono text-xs pt-2">
+                    <span className="text-cyan-300 font-bold block">RISK FACTOR BREAKDOWN:</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-300">
+                      <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Area Score: <b className="text-cyan-400">{breakdown.area_score}</b></div>
+                      <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">MPA Eco Proximity: <b className="text-cyan-400">{breakdown.ecological_proximity_score}</b></div>
+                      <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Coastal Proximity: <b className="text-cyan-400">{breakdown.coastal_proximity_score}</b></div>
+                      <div className="bg-ocean-950 p-2 rounded border border-cyan-500/10">Confidence Score: <b className="text-cyan-400">{breakdown.confidence_score}</b></div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               <div className="pt-3 flex justify-end">
                 <button
-                  onClick={() => onOpenReport && onOpenReport(activeDet.detection_id)}
+                  onClick={() => onOpenReport && onOpenReport(activeDet.detectionId || activeDet.detection_id)}
                   className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-600/30 hover:from-cyan-500/30 text-cyan-300 text-xs font-mono font-bold border border-cyan-400/30 flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />

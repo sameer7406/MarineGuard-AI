@@ -185,6 +185,36 @@ const MovementPredictionPage = ({ selectedDebris, mpaPolygons }) => {
                 <span className="text-amber-400 font-bold">MAE Metric: {predictionResult.prediction_error_mae_km || 5.72} km</span>
               </div>
 
+              {/* GIS Spatial Intersection Alert */}
+              {predictionResult.gis_spatial_analysis?.intersects_mpa && (
+                <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/40 font-mono text-xs space-y-1">
+                  <div className="flex items-center gap-2 text-red-400 font-bold">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>ECOLOGICAL SANCTUARY INTERSECTION DETECTED (GIS EPSG:3857)</span>
+                  </div>
+                  <p className="text-red-200 text-[11px] pl-6">
+                    Drift trajectory intersects <b>{predictionResult.gis_spatial_analysis.intersected_mpas?.join(', ')}</b>.
+                    {predictionResult.gis_spatial_analysis.exposure_distance_km > 0 && ` Exposure path length: ${predictionResult.gis_spatial_analysis.exposure_distance_km} km.`}
+                  </p>
+                </div>
+              )}
+
+              {/* Coastal Landfall / Beaching Constraint Alert */}
+              {(predictionResult.coastal_impact?.trajectory_reached_coast || predictionResult.gis_spatial_analysis?.coastal_impact?.trajectory_reached_coast) && (() => {
+                const coast = predictionResult.coastal_impact || predictionResult.gis_spatial_analysis?.coastal_impact;
+                return (
+                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 font-mono text-xs space-y-1">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>COASTAL ARRIVAL / BEACHING CONSTRAINT (PHYSICAL OCEAN BOUNDARY)</span>
+                    </div>
+                    <p className="text-amber-200 text-[11px] pl-6">
+                      Debris trajectory reaches mainland coastline at <b>{formatCoordinates(coast.coastal_arrival_latitude, coast.coastal_arrival_longitude)}</b> at <b>{coast.coastal_arrival_time_hours} hours</b> (distance: <b>{coast.coastal_intersection_distance_km} km</b>). Subsequent overland drift halted.
+                    </p>
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs font-mono">
                 {predictionResult.trajectory.map((step, idx) => (
                   <div key={idx} className="p-3 rounded-xl bg-ocean-950/80 border border-cyan-500/20 space-y-1">

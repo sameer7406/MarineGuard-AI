@@ -42,6 +42,11 @@
   font-family: 'Inter', sans-serif !important;
 }
 
+/* OpenStreetMap Dark / Ocean Tactical Theme Filter */
+.osm-tactical-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(95%);
+}
+
 .leaflet-popup-content-wrapper {
   background: rgba(7, 17, 38, 0.95) !important;
   color: #f1f5f9 !important;

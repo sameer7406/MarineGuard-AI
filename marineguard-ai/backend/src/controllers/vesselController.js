@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const VesselDetection = require('../models/VesselDetection');
 const { detectVesselsML } = require('../services/fastapiClient');
+const { isDBConnected } = require('../config/db');
 
 const SAMPLE_VESSEL_PATH = path.join(__dirname, '../../../data/sample/initial_vessels_samples.json');
 
@@ -38,14 +39,17 @@ let inMemoryVesselsStore = getSampleVessels();
 
 const getVesselList = async (req, res) => {
   const { riskLevel, aisStatus } = req.query;
-  try {
-    let query = {};
-    if (riskLevel) query.riskLevel = riskLevel.toUpperCase();
-    if (aisStatus) query.aisStatus = aisStatus;
 
-    const docs = await VesselDetection.find(query);
-    if (docs && docs.length > 0) return res.json({ count: docs.length, data: docs });
-  } catch (err) {}
+  if (isDBConnected()) {
+    try {
+      let query = {};
+      if (riskLevel) query.riskLevel = riskLevel.toUpperCase();
+      if (aisStatus) query.aisStatus = aisStatus;
+
+      const docs = await VesselDetection.find(query);
+      if (docs && docs.length > 0) return res.json({ count: docs.length, data: docs });
+    } catch (err) {}
+  }
 
   let filtered = [...inMemoryVesselsStore];
   if (riskLevel) {
@@ -60,10 +64,13 @@ const getVesselList = async (req, res) => {
 
 const getVesselById = async (req, res) => {
   const { id } = req.params;
-  try {
-    const doc = await VesselDetection.findOne({ vesselId: id });
-    if (doc) return res.json(doc);
-  } catch (err) {}
+
+  if (isDBConnected()) {
+    try {
+      const doc = await VesselDetection.findOne({ vesselId: id });
+      if (doc) return res.json(doc);
+    } catch (err) {}
+  }
 
   const found = inMemoryVesselsStore.find(v => v.vesselId === id);
   if (found) return res.json(found);
@@ -72,13 +79,20 @@ const getVesselById = async (req, res) => {
 };
 
 const detectVessel = async (req, res) => {
-  const { latitude, longitude } = req.body;
+  const { latitude, longitude, ais_status, speed_knots, loitering_detected } = req.body;
   const lat = latitude ? parseFloat(latitude) : 18.5500;
   const lon = longitude ? parseFloat(longitude) : 72.8500;
 
-  const mlRes = await detectVesselsML({ latitude: lat, longitude: lon });
+  const mlRes = await detectVesselsML({
+    latitude: lat,
+    longitude: lon,
+    ais_status: ais_status || undefined,
+    speed_knots: speed_knots !== undefined ? parseFloat(speed_knots) : undefined,
+    loitering_detected: loitering_detected !== undefined ? Boolean(loitering_detected) : undefined
+  });
 
   if (mlRes) {
+    const isInsideMPA = mlRes.gis_spatial_analysis ? Boolean(mlRes.gis_spatial_analysis.inside_protected_zone) : false;
     const vDoc = {
       vesselId: mlRes.detection_id || `VESSEL_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -86,18 +100,22 @@ const detectVessel = async (req, res) => {
       longitude: lon,
       vesselType: mlRes.cv_inference.vessel_class,
       confidence: mlRes.cv_inference.confidence,
-      aisStatus: mlRes.risk_assessment.risk_level === 'HIGH RISK' ? 'Missing' : 'Active',
-      speedKnots: 0.8,
+      aisStatus: ais_status || mlRes.ais_status || (mlRes.risk_assessment.risk_factors.some(f => f.includes('AIS')) ? 'Missing' : 'Active'),
+      speedKnots: speed_knots !== undefined ? parseFloat(speed_knots) : (mlRes.speed_knots ?? (isInsideMPA ? 0.8 : 12.4)),
       headingDegrees: 140.0,
       riskScore: mlRes.risk_assessment.vessel_risk_score,
       riskLevel: mlRes.risk_assessment.risk_level,
-      insideProtectedZone: true,
+      insideProtectedZone: isInsideMPA,
       riskFactors: mlRes.risk_assessment.risk_factors,
-      verificationStatus: mlRes.risk_assessment.risk_level === 'HIGH RISK' ? 'Requires Verification' : 'Verified'
+      verificationStatus: mlRes.risk_assessment.risk_level === 'HIGH RISK' ? 'Requires Verification' : 'Verified Standard Vessel'
     };
 
     try {
-      await VesselDetection.create(vDoc);
+      if (isDBConnected()) {
+        await VesselDetection.create(vDoc);
+      } else {
+        inMemoryVesselsStore.unshift(vDoc);
+      }
     } catch (e) {
       inMemoryVesselsStore.unshift(vDoc);
     }
@@ -105,6 +123,7 @@ const detectVessel = async (req, res) => {
   }
 
   // Fallback demo vessel detection
+  const demoIsInsideMPA = (lat >= 18.4 && lat <= 18.75 && lon >= 72.7 && lon <= 73.1);
   const demoVessel = {
     vesselId: `VESSEL_DETECTED_${Math.floor(lat*100)}_${Math.floor(lon*100)}`,
     timestamp: new Date().toISOString(),
@@ -112,16 +131,18 @@ const detectVessel = async (req, res) => {
     longitude: lon,
     vesselType: 'Suspicious/Unclassified',
     confidence: 0.89,
-    aisStatus: 'Missing',
-    speedKnots: 0.5,
+    aisStatus: ais_status || (demoIsInsideMPA ? 'Missing' : 'Active'),
+    speedKnots: speed_knots !== undefined ? parseFloat(speed_knots) : (demoIsInsideMPA ? 0.8 : 12.0),
     headingDegrees: 120.0,
-    riskScore: 82.0,
-    riskLevel: 'HIGH RISK',
-    insideProtectedZone: true,
-    riskFactors: [
+    riskScore: demoIsInsideMPA ? 82.0 : 45.0,
+    riskLevel: demoIsInsideMPA ? 'HIGH RISK' : 'MEDIUM RISK',
+    insideProtectedZone: demoIsInsideMPA,
+    riskFactors: demoIsInsideMPA ? [
       'Unidentified visual profile absent from standard vessel registry',
       'AIS transponder signal gap or unexpected transmission failure',
       'Vessel operating within designated Marine Protected Area (MPA) boundary'
+    ] : [
+      'Unidentified visual profile absent from standard vessel registry'
     ],
     verificationStatus: 'Requires Verification'
   };

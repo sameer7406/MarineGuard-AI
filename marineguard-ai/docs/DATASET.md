@@ -1,71 +1,81 @@
-# MarineGuard AI - Dataset Documentation
+# MarineGuard AI - Dataset Provenance & Integrity Specification
 
-## Overview
-MarineGuard AI utilizes multispectral satellite imagery, synthetic oceanographic drift telemetry, marine protected area (MPA) boundaries, and maritime AIS vessel data for ocean debris monitoring, movement prediction, and suspicious vessel detection.
+## Overview & Transparency Statement
+MarineGuard AI combines multispectral satellite remote sensing indices, oceanographic advection-diffusion physics, marine protected area (MPA) boundaries, and maritime AIS vessel behavior analytics.
 
----
-
-## 1. Sentinel-2 Multispectral Marine Debris Dataset (MARIDA Benchmark Alignment)
-
-### Primary Source & Format
-- **Dataset Reference:** MARIDA (Marine Debris Archive - Sentinel-2 dataset for floating plastic and marine debris benchmark).
-- **Satellite Constellation:** Sentinel-2A / Sentinel-2B Multi-Spectral Instrument (MSI).
-- **Spatial Resolution:** 10m (B02, B03, B04, B08), 20m (B05, B06, B07, B8A, B11, B12).
-- **Spectral Bands Used:**
-  - **B02 (Blue - 490 nm):** Water clarity & atmospheric baseline.
-  - **B03 (Green - 560 nm):** Chlorophyll & algal bloom discrimination.
-  - **B04 (Red - 665 nm):** Water absorption baseline.
-  - **B08 (NIR - 842 nm):** Floating vegetation / debris surface reflectance.
-  - **B11 (SWIR-1 - 1610 nm):** Floating plastic spectral absorption dip & Floating Debris Index (FDI).
-  - **B12 (SWIR-2 - 2190 nm):** Submerged vs. floating debris distinction.
-
-### Preprocessing & Index Calculations
-- **Floating Debris Index (FDI):**
-  $$FDI = R_{NIR} - \left( R_{RED} + (R_{SWIR1} - R_{RED}) \cdot \frac{\lambda_{NIR} - \lambda_{RED}}{\lambda_{SWIR1} - \lambda_{RED}} \cdot 1.61 \right)$$
-- **Normalized Difference Water Index (NDWI):**
-  $$NDWI = \frac{R_{GREEN} - R_{NIR}}{R_{GREEN} + R_{NIR}}$$
-- **Normalized Difference Vegetation Index (NDVI):**
-  $$NDVI = \frac{R_{NIR} - R_{RED}}{R_{NIR} + R_{RED}}$$
+To ensure strict scientific and engineering integrity, this document explicitly distinguishes between **Real Public Datasets/Specifications**, **Locally Generated Synthetic Benchmark Datasets**, **Model-Derived Outputs**, and **In-Memory Fallback Demo Data**.
 
 ---
 
-## 2. Oceanographic Current & Wind Telemetry Data
+## 1. Data Classification Taxonomy
 
-### Data Source
-- **Ocean Currents:** Copernicus Marine Environment Monitoring Service (CMEMS) Global Ocean Physics Analysis (U & V eastward/northward current components in m/s).
-- **Surface Wind:** ECMWF ERA5 Reanalysis / Open-Meteo Weather API 10-meter wind vectors (U_wind & V_wind in m/s).
-
-### Drift Dynamics Mechanics (Advection-Diffusion Model)
-The total velocity vector $\vec{V}_{debris}$ for floating debris movement is calculated as:
-$$\vec{V}_{debris} = \vec{V}_{current} + \alpha \cdot \vec{V}_{wind}$$
-where $\alpha \approx 0.03$ (3% windage coefficient for floating debris/plastics).
-
----
-
-## 3. Marine Protected Areas (MPA) & Ecological Zones
-
-### Data Source
-- **World Database on Protected Areas (WDPA) / Protected Planet GeoJSON datasets**.
-- Core zones covered in demo:
-  - Pacific Garbage Patch High-Risk Corridor (18.5°N - 24.2°N, 72.5°E - 73.5°E)
-  - Coastal Marine Reserves & Coral Reef Marine Sanctuaries.
-
----
-
-## 4. Maritime Vessel Detections & AIS Telemetry Dataset
-
-### Data Source
-- **xView3 Maritime Dataset / OpenAIS Telemetry Stream**.
-- Features recorded:
-  - `vessel_id` (Unique vessel identifier)
-  - `lat`, `lon` (Geographic coordinates)
-  - `vessel_type` (Cargo, Fishing, Tug, Tanker, Suspicious Unclassified)
-  - `ais_status` (Active, Missing/Gap, Spoofed, Offline)
-  - `speed_knots` & `heading_degrees`
-  - `protected_zone_overlap` (Boolean intersection with MPA polygon)
-  - `loitering_flag` (Anomalous stationary patterns in sensitive marine zones)
+### A. Real Public Data & Standards
+1. **Marine Protected Areas (MPA) Boundaries:**
+   - **Source:** World Database on Protected Areas (WDPA) / Protected Planet GeoJSON standards.
+   - **Format:** GeoJSON polygon boundaries (`data/sample/marine_protected_areas.geojson`).
+   - **Geographic CRS:** EPSG:4326 (WGS84) reprojected to EPSG:3857 (Spherical Mercator) for geodesic distance and inclusion analysis.
+2. **Sentinel-2 Multi-Spectral Instrument (MSI) Specifications:**
+   - **Bands:** B02 (490 nm, 10m), B03 (560 nm, 10m), B04 (665 nm, 10m), B08 (842 nm, 10m), B11 (1610 nm, 20m), B12 (2190 nm, 20m).
+   - **Formulae:** Standard peer-reviewed spectral indices:
+     - Floating Debris Index (FDI, Biermann et al., 2020)
+     - Normalized Difference Water Index (NDWI, McFeeters, 1996)
+     - Normalized Difference Vegetation Index (NDVI, Rouse et al., 1974)
+3. **Ocean Physical Advection Constants:**
+   - **Windage leeway factor:** $\alpha = 0.03$ (3% of surface wind vector, standard oceanographic value for unballasted floating debris).
+4. **Physical Coastline Geometry (Natural Earth 1:50m):**
+   - **Source:** Natural Earth 1:50m Physical Coastline (`ne_50m_coastline`).
+   - **License:** Public Domain (CC0 / unrestricted commercial and non-commercial dedication).
+   - **Format:** GeoJSON vector layer (`data/sample/coastline_50m.geojson`, 1,428 features, 1.6 MB).
+   - **CRS Used:** Native EPSG:4326 (WGS84); reprojected to EPSG:3857 (Spherical Mercator, metres) for accurate metric distance queries.
+   - **Calculation Method:** Vectorized minimum Euclidean distance on projected geometries via GeoPandas and Shapely (`Point.distance()`).
+   - **Fallback Behavior:** Returns `12.5 km` baseline with `gis_calculated: false` and diagnostic note if file is unavailable or coordinates are invalid.
 
 ---
 
-## 5. Dataset Reproducibility & Synthetic Pipeline
-In the absence of live API keys, `scripts/generate_sample_data.py` generates valid multispectral GeoTIFF tiles, synthetic ocean drift fields, and GeoJSON files containing realistic spectral profiles adhering to the exact published Sentinel-2 MARIDA band statistics.
+### B. Synthetic Demo Benchmark Data
+Due to hackathon environment constraints (absence of multi-gigabyte ESA Copernicus Open Access Hub or full 3.5 GB MARIDA download credentials), the local training and inference pipelines utilize synthetically generated benchmark data that strictly adheres to published spectral and spatial distributions:
+1. **Multispectral Sentinel-2 Imagery:**
+   - Generated by `scripts/generate_sample_data.py`.
+   - 40 synthetic multi-band tiles (6 bands, 256×256 pixels) stored as GeoTIFF rasters (`data/sample/sample_sentinel2_tile.tif`).
+   - Ground truth masks feature simulated circular Gaussian debris patches with elevated NIR (B08) and SWIR-1 (B11) reflectance against typical seawater absorption profiles.
+2. **Vessel Image Crops:**
+   - 500 synthetic 3-channel image patches (128×128 pixels) representing 5 maritime vessel classes: Cargo, Fishing, Tanker, Tug, and Suspicious/Unclassified.
+   - Baseline demo distribution used to demonstrate end-to-end PyTorch CNN training and inference.
+3. **Drift Displacement Telemetry:**
+   - 1,500 simulated drift trajectories generated by integrating Runge-Kutta 2nd order advection equations with Gaussian environmental turbulence over multi-horizon forecasts (6h, 12h, 24h, 48h, 72h).
+
+---
+
+### C. Model-Derived Inference Output
+- **Debris Segmentation Masks:** Generated by `DebrisUNet` (PyTorch 6-channel U-Net) performing pixel-level binary classification and polygon polygonization.
+- **Predicted Trajectory Waypoints:** Generated by hybrid physics + `GradientBoostingRegressor` drift displacement models.
+- **Vessel Classification & Suspicion Risk:** Generated by `VesselClassifier` (CNN) combined with behavioral rule checks (AIS transponder status, loitering anomaly, and GeoPandas MPA boundary intrusion).
+
+---
+
+### D. In-Memory Fallback & Demo Data
+- Stored in `data/sample/initial_debris_samples.json` and `data/sample/initial_vessels_samples.json`.
+- Activated automatically whenever MongoDB or external upstream services are offline, providing zero-downtime demonstration resilience for UI/UX inspection.
+
+---
+
+## 2. Model Evaluation Truth & Provenance Table
+
+| Model Architecture | Task | Dataset Source | Split (Train/Val/Test) | Evaluated Metric (Synthetic Hold-Out) | Interpretation & Limitations |
+| **DebrisUNet (PyTorch U-Net)** | 6-channel Sentinel-2 segmentation | Synthetic MARIDA-aligned benchmark (40 rasters) | 80% / 10% / 10% (32 / 4 / 4) | **IoU: 89.21%**, **Dice: 0.9430**, Precision: 0.8921, Recall: 1.0 | High IoU on circular synthetic targets; real ocean imagery contains clouds, glint, and whitecaps that require larger real-world fine-tuning. |
+| **VesselClassifier (PyTorch CNN)** | 5-class vessel classification | Synthetic morphological benchmark patches (500 patches) | 80% / 20% (400 / 100, stratified) | **Accuracy: 84.0%**, Macro-Precision: 86.4%, Macro-Recall: 84.0%, **Macro-F1: 83.9%** | Vessel classifier trained on synthetic morphological benchmark patches as a computer-vision pipeline demonstration prototype. Does not claim to reliably classify real-world vessels from satellite imagery without real-world fine-tuning. |
+| **Drift Model (GradientBoosting)** | Trajectory displacement regression | Synthetic ocean advection simulation (1500 vectors) | 80% / 20% (1200 / 300) | **MAE: 5.72 km**, Max Error: 28.72 km, Endpoint Error: 10.97 km | Validated against physical drift equations; real ocean deployment requires live CMEMS current and ERA5 wind data ingestion. |
+
+---
+
+## 3. Explicit Technical Limitations & Disclaimers
+
+1. **Near Real-Time, Not Live Streaming Video:**
+   - Sentinel-2 is a sun-synchronous polar-orbiting constellation with a 5-day revisit cycle (under twin A/B satellites).
+   - "Near Real-Time" denotes processing imagery tiles upon satellite ingest, not continuous real-time video surveillance.
+2. **Macroscopic Patch Resolution:**
+   - Sentinel-2's 10-meter spatial resolution means individual pixels span $100\text{ m}^2$.
+   - The system detects floating debris aggregations, convergence lines, and flotsam slicks. It does not detect individual millimeter-scale microplastic particles.
+3. **Decision-Support Risk Flags, Not Legal Proof:**
+   - The vessel intelligence module identifies "Suspicious Vessels" and "Potential Risk Flags" based on correlation of visual signatures with AIS gaps and MPA sanctuary boundaries.
+   - It is a maritime decision-support tool to prioritize patrol assets; it does not constitute legal proof of illegal fishing or maritime crime.

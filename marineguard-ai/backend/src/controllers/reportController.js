@@ -1,4 +1,5 @@
 const Report = require('../models/Report');
+const { isDBConnected } = require('../config/db');
 
 const generateReport = async (req, res) => {
   const { reportType, targetId, title } = req.body;
@@ -29,9 +30,12 @@ const generateReport = async (req, res) => {
     }
   };
 
-  try {
-    await Report.create(reportObj);
-  } catch (e) {}
+  // Persist to DB only when connected; never block on buffering
+  if (isDBConnected()) {
+    try {
+      await Report.create(reportObj);
+    } catch (e) {}
+  }
 
   return res.status(201).json({
     status: 'SUCCESS',
@@ -41,3 +45,4 @@ const generateReport = async (req, res) => {
 };
 
 module.exports = { generateReport };
+

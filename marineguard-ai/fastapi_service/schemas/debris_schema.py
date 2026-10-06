@@ -15,6 +15,9 @@ class DebrisRiskRequest(BaseModel):
     predicted_exposure_km: float = 15.0
     confidence: float = 0.90
     weights: Optional[RiskWeightConfig] = Field(default_factory=RiskWeightConfig)
+    # Optional: if provided, real GeoPandas/Shapely distance overrides protected_zone_distance_km
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class DebrisPredictRequest(BaseModel):
     latitude: float

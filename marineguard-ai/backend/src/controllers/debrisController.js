@@ -3,6 +3,7 @@ const path = require('path');
 const DebrisDetection = require('../models/DebrisDetection');
 const DebrisPrediction = require('../models/DebrisPrediction');
 const { detectDebrisML, predictDebrisTrajectoryML, calculateDebrisRiskML } = require('../services/fastapiClient');
+const { isDBConnected } = require('../config/db');
 
 const SAMPLE_DATA_PATH = path.join(__dirname, '../../../data/sample/initial_debris_samples.json');
 
@@ -33,17 +34,20 @@ let inMemoryDebrisStore = getSampleDebris();
 
 const getDebrisList = async (req, res) => {
   const { priority, minRisk } = req.query;
-  try {
-    let query = {};
-    if (priority) query.priority = priority.toUpperCase();
-    if (minRisk) query.riskScore = { $gte: parseFloat(minRisk) };
 
-    const docs = await DebrisDetection.find(query);
-    if (docs && docs.length > 0) {
-      return res.json({ count: docs.length, data: docs });
+  if (isDBConnected()) {
+    try {
+      let query = {};
+      if (priority) query.priority = priority.toUpperCase();
+      if (minRisk) query.riskScore = { $gte: parseFloat(minRisk) };
+
+      const docs = await DebrisDetection.find(query);
+      if (docs && docs.length > 0) {
+        return res.json({ count: docs.length, data: docs });
+      }
+    } catch (err) {
+      // Fall through to memory store on any DB error
     }
-  } catch (err) {
-    // Continue to memory fallback
   }
 
   let filtered = [...inMemoryDebrisStore];
@@ -59,10 +63,13 @@ const getDebrisList = async (req, res) => {
 
 const getDebrisById = async (req, res) => {
   const { id } = req.params;
-  try {
-    const doc = await DebrisDetection.findOne({ detectionId: id });
-    if (doc) return res.json(doc);
-  } catch (err) {}
+
+  if (isDBConnected()) {
+    try {
+      const doc = await DebrisDetection.findOne({ detectionId: id });
+      if (doc) return res.json(doc);
+    } catch (err) {}
+  }
 
   const found = inMemoryDebrisStore.find(d => d.detectionId === id);
   if (found) return res.json(found);
@@ -81,42 +88,63 @@ const detectDebris = async (req, res) => {
     const det = mlResponse.detections[0];
     const newDoc = {
       detectionId: det.detection_id,
+      detection_id: det.detection_id,
       imageId: tileId || 'S2B_MSIL1C_20261004T054500',
       timestamp: new Date().toISOString(),
       latitude: det.latitude,
       longitude: det.longitude,
       estimatedArea: det.estimated_area_m2,
+      estimated_area_m2: det.estimated_area_m2,
       confidence: det.confidence,
       riskScore: det.risk_score || 75.0,
+      risk_score: det.risk_score || 75.0,
       priority: det.priority || 'HIGH',
+      riskBreakdown: det.risk_breakdown || null,
+      risk_breakdown: det.risk_breakdown || null,
       geometry: det.geometry,
       spectralIndices: {
         fdi: det.fdi_spectral_index,
         ndwi: det.ndwi_index
       },
+      gisSpatialAnalysis: det.gis_spatial_analysis || null,
+      gis_spatial_analysis: det.gis_spatial_analysis || null,
       modelVersion: mlResponse.model_type || 'DebrisUNet_v1.0'
     };
 
     try {
-      await DebrisDetection.create(newDoc);
+      if (isDBConnected()) {
+        await DebrisDetection.create(newDoc);
+      } else {
+        inMemoryDebrisStore.unshift(newDoc);
+      }
     } catch (e) {
       inMemoryDebrisStore.unshift(newDoc);
     }
 
-    return res.status(201).json({ status: 'SUCCESS', detection: newDoc, diagnostics: mlResponse.diagnostics });
+    return res.status(201).json({
+      status: 'SUCCESS',
+      detection: newDoc,
+      detections: [newDoc],
+      diagnostics: mlResponse.diagnostics
+    });
   }
 
   // Fallback demo detection creation
   const demoDoc = {
     detectionId: `DEBRIS_${Math.floor(lat*100)}_${Math.floor(lon*100)}`,
+    detection_id: `DEBRIS_${Math.floor(lat*100)}_${Math.floor(lon*100)}`,
     imageId: tileId || 'S2B_MSIL1C_20261004T054500',
     timestamp: new Date().toISOString(),
     latitude: lat,
     longitude: lon,
     estimatedArea: 2450.0,
+    estimated_area_m2: 2450.0,
     confidence: 0.91,
     riskScore: 78.0,
+    risk_score: 78.0,
     priority: 'HIGH',
+    riskBreakdown: { area_score: 50.0, ecological_proximity_score: 80.0, coastal_proximity_score: 75.0, confidence_score: 91.0 },
+    risk_breakdown: { area_score: 50.0, ecological_proximity_score: 80.0, coastal_proximity_score: 75.0, confidence_score: 91.0 },
     geometry: {
       type: 'Polygon',
       coordinates: [[
@@ -130,7 +158,7 @@ const detectDebris = async (req, res) => {
     modelVersion: 'DebrisUNet_v1.0 (Demo Inference)'
   };
   inMemoryDebrisStore.unshift(demoDoc);
-  return res.status(201).json({ status: 'SUCCESS', detection: demoDoc });
+  return res.status(201).json({ status: 'SUCCESS', detection: demoDoc, detections: [demoDoc] });
 };
 
 const calculateRisk = async (req, res) => {
